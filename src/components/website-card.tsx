@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { CartesianGrid, Dot, Line, LineChart, XAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 import {
   Card,
@@ -42,9 +44,9 @@ const generateChartData = () => {
 
     data.push({
       time: time.toLocaleTimeString("en-US", {
-        hour: "2-digit",
+        hour: "numeric",
         minute: "2-digit",
-        hour12: false,
+        hour12: true,
       }),
       responseTime,
       status,
@@ -101,11 +103,24 @@ const CustomTooltipContent = (props: any) => {
   const { active, payload, label } = props;
   if (active && payload && payload.length) {
     const data = payload[0].payload;
+
+    let statusColorClass = "bg-green-500";
+    if (data.status === 0) {
+      statusColorClass = "bg-gray-500";
+    } else if (data.status >= 500) {
+      statusColorClass = "bg-red-500";
+    } else if (data.status >= 400) {
+      statusColorClass = "bg-yellow-500";
+    }
+
     return (
       <div className="p-2 text-sm bg-background/90 border rounded-lg shadow-lg">
         <p className="font-bold">{`Time: ${label}`}</p>
         <p>{`Response Time: ${data.responseTime}ms`}</p>
-        <p>{`Status: ${data.status}`}</p>
+        <div className="flex items-center gap-2">
+          <p>{`Status: ${data.status}`}</p>
+          <span className={cn("w-2 h-2 rounded-full", statusColorClass)} />
+        </div>
       </div>
     );
   }
@@ -163,55 +178,53 @@ export default function WebsiteCard({ siteName }: { siteName: string }) {
   const { category: lastStatusCategory, color: statusColorClass } = getStatus();
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-3xl">{siteName}</CardTitle>
-        <Badge className={cn("text-white", statusColorClass)}>
-          {lastStatusCategory}: {lastStatus}
-        </Badge>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig}>
-          <LineChart
-            accessibilityLayer
-            data={chartData}
-            margin={{
-              top: 20,
-              left: 20,
-              right: 20,
-              bottom: 5,
-            }}
-          >
-            <CartesianGrid vertical={false} />
-            <XAxis
-              dataKey="time"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              tickFormatter={(value) => value.slice(0, 5)}
-              interval={3}
-            />
-            <ChartTooltip
-              cursor={false}
-              content={<CustomTooltipContent />}
-            />
-            <Line
-              dataKey="responseTime"
-              type="natural"
-              stroke="var(--color-responseTime)"
-              strokeWidth={2}
-              dot={<CustomDot />}
-            />
-          </LineChart>
-        </ChartContainer>
-      </CardContent>
-      <CardFooter className="flex justify-between items-end">
-        <div>
-          <p className="text-2xl font-bold text-foreground">{avgResponseTime}ms</p>
-          <p className="text-xs text-muted-foreground">Avg. Response</p>
-        </div>
-        <div className="text-sm text-muted-foreground">Last checked: Just now</div>
-      </CardFooter>
-    </Card>
+    <Link href={`/site/${encodeURIComponent(siteName)}`}>
+      <Card className="hover:border-primary/50 transition-colors">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-3xl">{siteName}</CardTitle>
+          <Badge className={cn("text-white", statusColorClass)}>
+            {lastStatusCategory}: {lastStatus}
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfig}>
+            <LineChart
+              accessibilityLayer
+              data={chartData}
+              margin={{ top: 20, right: 10, bottom: 0, left: 25 }}
+            >
+              <CartesianGrid vertical={false} />
+              <XAxis
+                dataKey="time"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                interval={3}
+              />
+              <ChartTooltip
+                cursor={false}
+                content={<CustomTooltipContent />}
+              />
+              <Line
+                dataKey="responseTime"
+                type="natural"
+                stroke="var(--color-responseTime)"
+                strokeWidth={2}
+                dot={<CustomDot />}
+              />
+            </LineChart>
+          </ChartContainer>
+        </CardContent>
+        <CardFooter className="flex justify-between items-end">
+          <div>
+            <p className="text-2xl font-bold text-foreground">{avgResponseTime}ms</p>
+            <p className="text-xs text-muted-foreground">Avg. Response</p>
+          </div>
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <ArrowRight className="w-4 h-4" />
+          </div>
+        </CardFooter>
+      </Card>
+    </Link>
   );
 }
