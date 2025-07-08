@@ -1,7 +1,19 @@
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import Header from "@/components/header";
 import WebsiteCard from "@/components/website-card";
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return redirect("/login");
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
