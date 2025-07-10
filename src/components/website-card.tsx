@@ -33,7 +33,7 @@ export default function WebsiteCard({
   website: { id: string; name: string; url: string };
   isDemo?: boolean;
 }) {
-  const [chartData, setChartData] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<{time: string; responseTime: number; status: number}[]>([]);
   const supabase = createClient();
 
   useEffect(() => {
@@ -55,14 +55,12 @@ export default function WebsiteCard({
     if (statusChecks && statusChecks.length > 0) {
       const formattedData = statusChecks.reverse().map((check) => ({
         time: new Date(check.checked_at).toLocaleTimeString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: true,
-        }),
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }),
         responseTime: check.response_time || 0,
-        status: check.status === "Online" ? 200 :
-                check.status === "Offline" ? 500 :
-                check.status === "Timeout" ? 0 : 200,
+        status: check.status_code || 0,
       }));
       setChartData(formattedData);
     } else {
@@ -77,12 +75,12 @@ export default function WebsiteCard({
         <Card className="hover:border-primary/50 transition-colors">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-3xl">{website.name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[175px] w-full flex items-center justify-center">
+        </CardHeader>
+        <CardContent>
+          <div className="h-[175px] w-full flex items-center justify-center">
               <p className="text-muted-foreground">{message}</p>
-            </div>
-          </CardContent>
+          </div>
+        </CardContent>
           <CardFooter className="flex justify-between items-end">
             <div>
               <p className="text-2xl font-bold text-foreground">-</p>
@@ -90,9 +88,9 @@ export default function WebsiteCard({
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <ArrowRight className="w-4 h-4" />
-            </div>
-          </CardFooter>
-        </Card>
+          </div>
+        </CardFooter>
+      </Card>
       </Link>
     );
   }
@@ -110,9 +108,11 @@ export default function WebsiteCard({
 
   const getStatus = () => {
     if (lastStatus === 0) return { category: "Timeout", color: "bg-gray-500 hover:bg-gray-500/80" };
-    if (lastStatus >= 500) return { category: "Offline", color: "bg-red-500 hover:bg-red-500/80" };
-    if (lastStatus >= 400) return { category: "Warning", color: "bg-yellow-500 hover:bg-yellow-500/80" };
-    return { category: "Online", color: "bg-green-500 hover:bg-green-500/80" };
+    if (lastStatus >= 500) return { category: "Server Error", color: "bg-red-500 hover:bg-red-500/80" };
+    if (lastStatus >= 400) return { category: "Client Error", color: "bg-yellow-500 hover:bg-yellow-500/80" };
+    if (lastStatus >= 300) return { category: "Redirect", color: "bg-blue-500 hover:bg-blue-500/80" };
+    if (lastStatus >= 200) return { category: "Online", color: "bg-green-500 hover:bg-green-500/80" };
+    return { category: "Unknown", color: "bg-gray-500 hover:bg-gray-500/80" };
   };
 
   const { category: lastStatusCategory, color: statusColorClass } = getStatus();

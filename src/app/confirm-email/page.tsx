@@ -62,7 +62,7 @@ export default async function ConfirmEmailPage({
 
           <div className="pt-4 space-y-3">
             <p className="text-xs text-gray-500 text-center">
-              Didn't receive the email? Check your spam folder or{" "}
+              Didn&apos;t receive the email? Check your spam folder or{" "}
               <Link href="/create-account" className="text-primary hover:underline">
                 try again
               </Link>

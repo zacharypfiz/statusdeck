@@ -51,6 +51,8 @@ export const CustomDot = (props: {
     fill = "var(--color-red-500)";
   } else if (status >= 400) {
     fill = "var(--color-yellow-500)";
+  } else if (status >= 300) {
+    fill = "var(--color-blue-500)";
   } else if (status >= 200) {
     fill = "var(--color-green-500)";
   }
@@ -68,12 +70,23 @@ export const CustomTooltipContent = (props: {
     const data = payload[0].payload;
 
     let statusColorClass = "bg-green-500";
+    let statusText = "Online";
+    
     if (data.status === 0) {
       statusColorClass = "bg-gray-500";
+      statusText = "Timeout";
     } else if (data.status >= 500) {
       statusColorClass = "bg-red-500";
+      statusText = "Server Error";
     } else if (data.status >= 400) {
       statusColorClass = "bg-yellow-500";
+      statusText = "Client Error";
+    } else if (data.status >= 300) {
+      statusColorClass = "bg-blue-500";
+      statusText = "Redirect";
+    } else if (data.status >= 200) {
+      statusColorClass = "bg-green-500";
+      statusText = "Success";
     }
 
     const date = new Date(label || "");
@@ -90,11 +103,11 @@ export const CustomTooltipContent = (props: {
     }
 
     return (
-      <div className="p-2 text-sm bg-background/90 border rounded-lg shadow-lg">
+      <div className="p-3 text-sm bg-background/95 border rounded-lg shadow-lg">
         <p className="font-bold">{formattedLabel}</p>
-        <p>{`Response Time: ${data.responseTime}ms`}</p>
-        <div className="flex items-center gap-2">
-          <p>{`Status: ${data.status}`}</p>
+        <p className="text-muted-foreground">{`Response Time: ${data.responseTime}ms`}</p>
+        <div className="flex items-center gap-2 mt-1">
+          <p className="font-medium">{`${statusText} (${data.status})`}</p>
           <span className={cn("w-2 h-2 rounded-full", statusColorClass)} />
         </div>
       </div>

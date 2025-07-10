@@ -37,7 +37,7 @@ export default async function Home() {
           {websites && websites.length === 0 && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-blue-800">
-                No websites added yet. The sites below are demo data. Click "+ Add Site" to start monitoring your own websites.
+                No websites added yet. The sites below are demo data. Click &quot;+ Add Site&quot; to start monitoring your own websites.
               </p>
             </div>
           )}

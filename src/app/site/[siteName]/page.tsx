@@ -35,7 +35,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/header";
-import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
 import StatCard from "@/components/stat-card";
@@ -50,8 +49,8 @@ export default function SiteDashboardPage() {
   const params = useParams<{ siteName: string }>();
   const router = useRouter();
   const [timeRange, setTimeRange] = useState("6h");
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [website, setWebsite] = useState<any>(null);
+  const [chartData, setChartData] = useState<{time: string; responseTime: number; status: number}[]>([]);
+  const [website, setWebsite] = useState<{id?: string; name: string; url: string} | null>(null);
   const [isDemo, setIsDemo] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -90,8 +89,8 @@ export default function SiteDashboardPage() {
   };
 
   const fetchStatusChecks = async () => {
-    if (isDemo) {
-      setChartData(generateChartData(timeRange));
+    if (isDemo || !website) {
+    setChartData(generateChartData(timeRange));
       return;
     }
 
@@ -119,7 +118,7 @@ export default function SiteDashboardPage() {
     const { data: statusChecks } = await supabase
       .from("status_checks")
       .select("*")
-      .eq("website_id", website.id)
+      .eq("website_id", website.id!)
       .gte("checked_at", startTime.toISOString())
       .order("checked_at", { ascending: true });
 
@@ -127,9 +126,7 @@ export default function SiteDashboardPage() {
       const formattedData = statusChecks.map((check) => ({
         time: check.checked_at,
         responseTime: check.response_time || 0,
-        status: check.status === "Online" ? 200 : 
-                check.status === "Offline" ? 500 : 
-                check.status === "Timeout" ? 0 : 200,
+        status: check.status_code || 0,
       }));
       setChartData(formattedData);
     } else {
@@ -206,13 +203,13 @@ export default function SiteDashboardPage() {
         processedUrl = "https://" + processedUrl;
       }
 
-      const { error: updateError } = await supabase
-        .from("websites")
-        .update({
-          name: editName.trim(),
-          url: processedUrl,
-        })
-        .eq("id", website.id);
+          const { error: updateError } = await supabase
+      .from("websites")
+      .update({
+        name: editName.trim(),
+        url: processedUrl,
+      })
+      .eq("id", website.id!);
 
       if (updateError) {
         setError("Failed to update website. Please try again.");
@@ -241,10 +238,10 @@ export default function SiteDashboardPage() {
     setError("");
 
     try {
-      const { error: deleteError } = await supabase
-        .from("websites")
-        .delete()
-        .eq("id", website.id);
+          const { error: deleteError } = await supabase
+      .from("websites")
+      .delete()
+      .eq("id", website.id!);
 
       if (deleteError) {
         setError("Failed to delete website. Please try again.");
@@ -467,7 +464,7 @@ export default function SiteDashboardPage() {
           <DialogHeader>
             <DialogTitle>Delete Website</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{website?.name}"? This action cannot be undone and will permanently remove all monitoring data.
+              Are you sure you want to delete &quot;{website?.name}&quot;? This action cannot be undone and will permanently remove all monitoring data.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

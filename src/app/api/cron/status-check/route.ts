@@ -1,0 +1,126 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+
+export async function GET(request: NextRequest) {
+    try {
+        const authHeader = request.headers.get("authorization");
+        if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+            return NextResponse.json({ error: "Unauthorized" }, {
+                status: 401,
+            });
+        }
+
+        const supabase = await createClient();
+
+        const { data: websites, error: fetchError } = await supabase
+            .from("websites")
+            .select("*");
+
+        if (fetchError) {
+            console.error("Error fetching websites:", fetchError);
+            return NextResponse.json({ error: "Failed to fetch websites" }, {
+                status: 500,
+            });
+        }
+
+        if (!websites || websites.length === 0) {
+            return NextResponse.json({
+                success: true,
+                message: "No websites to check",
+                timestamp: new Date().toISOString(),
+            });
+        }
+
+        const results = await Promise.allSettled(
+            websites.map(async (website) => {
+                const startTime = Date.now();
+
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(
+                        () => controller.abort(),
+                        10000,
+                    );
+
+                    const response = await fetch(website.url, {
+                        method: "GET",
+                        signal: controller.signal,
+                        headers: {
+                            "User-Agent": "StatusDeck Monitor/1.0",
+                        },
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    const responseTime = Date.now() - startTime;
+                    const status = response.ok ? "Online" : "Offline";
+                    const statusCode = response.status;
+
+                    await supabase
+                        .from("status_checks")
+                        .insert({
+                            website_id: website.id,
+                            status: status,
+                            response_time: responseTime,
+                            status_code: statusCode,
+                            checked_at: new Date().toISOString(),
+                        });
+
+                    return {
+                        website: website.name,
+                        status,
+                        responseTime,
+                        statusCode,
+                    };
+                } catch (error) {
+                    const responseTime = Date.now() - startTime;
+
+                    await supabase
+                        .from("status_checks")
+                        .insert({
+                            website_id: website.id,
+                            status: "Timeout",
+                            response_time: responseTime,
+                            status_code: 0,
+                            checked_at: new Date().toISOString(),
+                        });
+
+                    return {
+                        website: website.name,
+                        status: "Timeout",
+                        responseTime,
+                        statusCode: 0,
+                        error: error instanceof Error
+                            ? error.message
+                            : "Unknown error",
+                    };
+                }
+            }),
+        );
+
+        const successful = results.filter((r) =>
+            r.status === "fulfilled"
+        ).length;
+        const failed = results.filter((r) => r.status === "rejected").length;
+
+        console.log(
+            `Status check completed: ${successful} successful, ${failed} failed`,
+        );
+
+        return NextResponse.json({
+            success: true,
+            message: `Checked ${websites.length} websites`,
+            results: {
+                total: websites.length,
+                successful,
+                failed,
+            },
+            timestamp: new Date().toISOString(),
+        });
+    } catch (error) {
+        console.error("Status check cron error:", error);
+        return NextResponse.json({ error: "Internal server error" }, {
+            status: 500,
+        });
+    }
+}
