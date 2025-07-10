@@ -131,7 +131,7 @@ export default function WebsiteCard({
             <LineChart
               accessibilityLayer
               data={chartData}
-              margin={{ top: 20, right: 10, bottom: 0, left: 25 }}
+              margin={{ top: 20, right: 25, bottom: 0, left: 25 }}
             >
               <CartesianGrid vertical={false} />
               <XAxis

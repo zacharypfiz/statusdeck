@@ -326,7 +326,7 @@ export default function SiteDashboardPage() {
             <CardContent>
               {chartData.length > 0 ? (
                 <ChartContainer config={chartConfig} className="h-96 w-full">
-                  <LineChart data={chartData} margin={{ top: 20, right: 20, bottom: 5, left: 20 }}>
+                  <LineChart data={chartData} margin={{ top: 20, right: 25, bottom: 5, left: 20 }}>
                     <CartesianGrid vertical={false} />
                     <XAxis
                       dataKey="time"
