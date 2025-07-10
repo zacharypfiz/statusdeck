@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import {
   CartesianGrid,
-  Dot,
   Line,
   LineChart,
   XAxis,
@@ -19,150 +19,123 @@ import {
 import {
   ChartContainer,
   ChartTooltip,
-  ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import Header from "@/components/header";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Settings } from "lucide-react";
 import StatCard from "@/components/stat-card";
-
-const generateChartData = (timeRange: string) => {
-  const data = [];
-  const now = new Date();
-  let points = 0;
-  let intervalMinutes = 0;
-
-  switch (timeRange) {
-    case "1h":
-      points = 12;
-      intervalMinutes = 5;
-      break;
-    case "6h":
-      points = 72;
-      intervalMinutes = 5;
-      break;
-    case "24h":
-      points = 288;
-      intervalMinutes = 5;
-      break;
-    case "7d":
-      points = 168; // 1 point per hour
-      intervalMinutes = 60;
-      break;
-    case "30d":
-      points = 120; // 1 point per 6 hours
-      intervalMinutes = 360;
-      break;
-    default:
-      points = 288;
-      intervalMinutes = 5;
-  }
-
-  for (let i = points - 1; i >= 0; i--) {
-    const time = new Date(now.getTime() - i * intervalMinutes * 60 * 1000);
-    const hour = time.getHours();
-
-    const baseResponseTime = 150 + Math.sin((hour / 24) * Math.PI * 2) * 50;
-    let responseTime = Math.round(baseResponseTime + Math.random() * 80);
-
-    let status = 200;
-    const random = Math.random();
-    if (random > 0.98) {
-      status = 0; // Timeout
-      responseTime = 0;
-    } else if (random > 0.95) {
-      status = 500 + Math.floor(Math.random() * 4);
-    } else if (random > 0.9) {
-      status = 400 + Math.floor(Math.random() * 5);
-    }
-
-    data.push({
-      time: time.toISOString(), // Use ISO string for the full timestamp
-      responseTime,
-      status,
-    });
-  }
-  return data;
-};
-
-const chartConfig = {
-  responseTime: {
-    label: "Response Time",
-    color: "var(--chart-1)",
-  },
-};
-
-const CustomDot = (props: any) => {
-  const { cx, cy, payload } = props;
-  const { status } = payload;
-
-  if (status === 0) {
-    return (
-      <svg x={cx - 6} y={cy - 6} width="12" height="12" fill="none" viewBox="0 0 24 24">
-        <path stroke="var(--color-red-500)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M18 6L6 18M6 6l12 12" />
-      </svg>
-    );
-  }
-
-  let fill = "var(--chart-1)";
-  if (status >= 500) fill = "var(--color-red-500)";
-  else if (status >= 400) fill = "var(--color-yellow-500)";
-  else if (status >= 200) fill = "var(--color-green-500)";
-
-  return <Dot cx={cx} cy={cy} r={3} fill={fill} />;
-};
-
-const CustomTooltipContent = (props: any) => {
-  const { active, payload, label } = props;
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-
-    let statusColorClass = "bg-green-500";
-    if (data.status === 0) {
-      statusColorClass = "bg-gray-500";
-    } else if (data.status >= 500) {
-      statusColorClass = "bg-red-500";
-    } else if (data.status >= 400) {
-      statusColorClass = "bg-yellow-500";
-    }
-
-    const date = new Date(label);
-    const formattedLabel = date.toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-
-    return (
-      <div className="p-2 text-sm bg-background/90 border rounded-lg shadow-lg">
-        <p className="font-bold">{formattedLabel}</p>
-        <p>{`Response Time: ${data.responseTime}ms`}</p>
-        <div className="flex items-center gap-2">
-          <p>{`Status: ${data.status}`}</p>
-          <span className={cn("w-2 h-2 rounded-full", statusColorClass)} />
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
+import {
+  CustomDot,
+  CustomTooltipContent,
+  chartConfig,
+} from "@/components/shared-chart-components";
+import { generateChartData } from "@/lib/mock-data";
 
 export default function SiteDashboardPage() {
   const params = useParams<{ siteName: string }>();
+  const router = useRouter();
   const [timeRange, setTimeRange] = useState("6h");
   const [chartData, setChartData] = useState<any[]>([]);
+  const [website, setWebsite] = useState<any>(null);
+  const [isDemo, setIsDemo] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editUrl, setEditUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const siteName = decodeURIComponent(params.siteName);
+  const supabase = createClient();
 
   useEffect(() => {
-    setChartData(generateChartData(timeRange));
-  }, [timeRange]);
+    fetchWebsiteData();
+  }, [siteName]);
+
+  useEffect(() => {
+    if (website) {
+      fetchStatusChecks();
+    }
+  }, [website, timeRange]);
+
+  const fetchWebsiteData = async () => {
+    const { data: websiteData } = await supabase
+      .from("websites")
+      .select("*")
+      .eq("name", siteName)
+      .single();
+
+    if (websiteData) {
+      setWebsite(websiteData);
+      setIsDemo(false);
+    } else {
+      setWebsite({ name: siteName, url: `https://${siteName}` });
+      setIsDemo(true);
+      setChartData(generateChartData(timeRange));
+    }
+  };
+
+  const fetchStatusChecks = async () => {
+    if (isDemo) {
+      setChartData(generateChartData(timeRange));
+      return;
+    }
+
+    const now = new Date();
+    let startTime = new Date();
+    
+    switch (timeRange) {
+      case "1h":
+        startTime = new Date(now.getTime() - 60 * 60 * 1000);
+        break;
+      case "6h":
+        startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+        break;
+      case "24h":
+        startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case "7d":
+        startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case "30d":
+        startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+    }
+
+    const { data: statusChecks } = await supabase
+      .from("status_checks")
+      .select("*")
+      .eq("website_id", website.id)
+      .gte("checked_at", startTime.toISOString())
+      .order("checked_at", { ascending: true });
+
+    if (statusChecks && statusChecks.length > 0) {
+      const formattedData = statusChecks.map((check) => ({
+        time: check.checked_at,
+        responseTime: check.response_time || 0,
+        status: check.status === "Online" ? 200 : 
+                check.status === "Offline" ? 500 : 
+                check.status === "Timeout" ? 0 : 200,
+      }));
+      setChartData(formattedData);
+    } else {
+      setChartData([]);
+    }
+  };
 
   const formatTick = (tick: string) => {
     const date = new Date(tick);
@@ -202,7 +175,7 @@ export default function SiteDashboardPage() {
     const successfulChecks = chartData.filter(
       (d) => d.status >= 200 && d.status < 300
     ).length;
-    const uptime = (successfulChecks / chartData.length) * 100;
+    const uptime = chartData.length > 0 ? (successfulChecks / chartData.length) * 100 : 0;
     const incidents = chartData.length - successfulChecks;
 
     return {
@@ -215,6 +188,103 @@ export default function SiteDashboardPage() {
 
   const stats = calculateStats();
 
+  const handleUpdateWebsite = async () => {
+    if (!website || isDemo) return;
+    
+    setLoading(true);
+    setError("");
+
+    if (!editName.trim() || !editUrl.trim()) {
+      setError("Please fill in both fields");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      let processedUrl = editUrl.trim();
+      if (!processedUrl.startsWith("http://") && !processedUrl.startsWith("https://")) {
+        processedUrl = "https://" + processedUrl;
+      }
+
+      const { error: updateError } = await supabase
+        .from("websites")
+        .update({
+          name: editName.trim(),
+          url: processedUrl,
+        })
+        .eq("id", website.id);
+
+      if (updateError) {
+        setError("Failed to update website. Please try again.");
+        console.error("Update error:", updateError);
+        return;
+      }
+
+      setWebsite({ ...website, name: editName.trim(), url: processedUrl });
+      setIsSettingsOpen(false);
+      
+      if (editName.trim() !== siteName) {
+        router.push(`/site/${encodeURIComponent(editName.trim())}`);
+      }
+    } catch (err) {
+      setError("An unexpected error occurred");
+      console.error("Error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteWebsite = async () => {
+    if (!website || isDemo) return;
+    
+    setLoading(true);
+    setError("");
+
+    try {
+      const { error: deleteError } = await supabase
+        .from("websites")
+        .delete()
+        .eq("id", website.id);
+
+      if (deleteError) {
+        setError("Failed to delete website. Please try again.");
+        console.error("Delete error:", deleteError);
+        return;
+      }
+
+      router.push("/");
+    } catch (err) {
+      setError("An unexpected error occurred");
+      console.error("Error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openSettings = () => {
+    if (website && !isDemo) {
+      setEditName(website.name);
+      setEditUrl(website.url);
+      setError("");
+      setIsSettingsOpen(true);
+    }
+  };
+
+  if (!website) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <Header />
+        <main className="flex-1 p-6">
+          <div className="container mx-auto">
+            <div className="flex items-center justify-center h-64">
+              <p className="text-muted-foreground">Loading...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
@@ -225,7 +295,22 @@ export default function SiteDashboardPage() {
               <Link href="/" className="p-2 rounded-full hover:bg-muted">
                 <ArrowLeft className="w-6 h-6" />
               </Link>
-              <h2 className="text-3xl font-bold">{siteName}</h2>
+              <h2 className="text-3xl font-bold">{website.name}</h2>
+              {!isDemo && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={openSettings}
+                  className="p-2 rounded-full hover:bg-muted"
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
+              )}
+              {isDemo && (
+                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                  Demo Data
+                </span>
+              )}
             </div>
             <ToggleGroup
               type="single"
@@ -274,7 +359,9 @@ export default function SiteDashboardPage() {
                 </ChartContainer>
               ) : (
                 <div className="h-96 w-full flex items-center justify-center">
-                  <p className="text-muted-foreground">Loading chart data...</p>
+                  <p className="text-muted-foreground">
+                    {isDemo ? "Loading chart data..." : "No monitoring data available for this time range"}
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -293,6 +380,114 @@ export default function SiteDashboardPage() {
           </div>
         </div>
       </main>
+
+      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Website Settings</DialogTitle>
+            <DialogDescription>
+              Manage your website monitoring configuration.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="edit-name" className="text-sm font-medium">
+                  Site Name
+                </label>
+                <Input
+                  id="edit-name"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  disabled={loading}
+                  placeholder="Enter site name"
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="edit-url" className="text-sm font-medium">
+                  URL
+                </label>
+                <Input
+                  id="edit-url"
+                  value={editUrl}
+                  onChange={(e) => setEditUrl(e.target.value)}
+                  disabled={loading}
+                  placeholder="https://example.com"
+                />
+              </div>
+            </div>
+
+            <div className="border-t pt-6">
+              <div className="space-y-3">
+                <div>
+                  <h4 className="text-sm font-medium text-red-900">Danger Zone</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Permanently delete this website and all its monitoring data.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDeleteConfirmOpen(true)}
+                  disabled={loading}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  Delete Website
+                </Button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
+                {error}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsSettingsOpen(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateWebsite}
+              disabled={loading}
+            >
+              {loading ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Website</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{website?.name}"? This action cannot be undone and will permanently remove all monitoring data.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteConfirmOpen(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteWebsite}
+              disabled={loading}
+            >
+              {loading ? "Deleting..." : "Delete Website"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

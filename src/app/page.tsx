@@ -14,17 +14,41 @@ export default async function Home() {
     return redirect("/login");
   }
 
+  const { data: websites } = await supabase
+    .from("websites")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  const mockWebsites = [
+    { id: "mock-1", name: "google.com", url: "https://google.com" },
+    { id: "mock-2", name: "github.com", url: "https://github.com" },
+    { id: "mock-3", name: "vercel.com", url: "https://vercel.com" },
+    { id: "mock-4", name: "cloudflare.com", url: "https://cloudflare.com" },
+  ];
+
+  const sitesToShow = websites && websites.length > 0 ? websites : mockWebsites;
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
-      <main className="flex-1 p-6 bg-gray-50/50">
+      <main className="flex-1 p-6">
         <div className="container mx-auto">
           <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
+          {websites && websites.length === 0 && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-blue-800">
+                No websites added yet. The sites below are demo data. Click "+ Add Site" to start monitoring your own websites.
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <WebsiteCard siteName="google.com" />
-            <WebsiteCard siteName="github.com" />
-            <WebsiteCard siteName="vercel.com" />
-            <WebsiteCard siteName="cloudflare.com" />
+            {sitesToShow.map((site) => (
+              <WebsiteCard 
+                key={site.id} 
+                website={site} 
+                isDemo={!websites || websites.length === 0}
+              />
+            ))}
           </div>
         </div>
       </main>

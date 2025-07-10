@@ -1,12 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import AddSiteModal from "./add-site-modal";
 import Link from "next/link";
 
 export default function Header() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const router = useRouter();
+
+  const handleSiteAdded = () => {
+    router.refresh();
+  };
 
   return (
     <>
@@ -39,7 +45,11 @@ export default function Header() {
           </div>
         </div>
       </header>
-      <AddSiteModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <AddSiteModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSiteAdded={handleSiteAdded}
+      />
     </>
   );
 } 

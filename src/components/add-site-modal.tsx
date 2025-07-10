@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -14,28 +16,126 @@ import { Button } from "@/components/ui/button";
 export default function AddSiteModal({
   isOpen,
   onClose,
+  onSiteAdded,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  onSiteAdded?: () => void;
 }) {
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const supabase = createClient();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    if (!name.trim() || !url.trim()) {
+      setError("Please fill in both fields");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setError("You must be logged in to add a website");
+        setLoading(false);
+        return;
+      }
+
+      let processedUrl = url.trim();
+      if (!processedUrl.startsWith("http://") && !processedUrl.startsWith("https://")) {
+        processedUrl = "https://" + processedUrl;
+      }
+
+      const { error: insertError } = await supabase
+        .from("websites")
+        .insert([
+          {
+            name: name.trim(),
+            url: processedUrl,
+            user_id: user.id,
+          },
+        ]);
+
+      if (insertError) {
+        setError("Failed to add website. Please try again.");
+        console.error("Insert error:", insertError);
+        return;
+      }
+
+      setName("");
+      setUrl("");
+      onClose();
+      onSiteAdded?.();
+    } catch (err) {
+      setError("An unexpected error occurred");
+      console.error("Error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    setName("");
+    setUrl("");
+    setError("");
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add a new site</DialogTitle>
           <DialogDescription>
-            Enter the URL of the site you want to monitor.
+            Enter the details of the site you want to monitor.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <Input placeholder="https://example.com" />
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button>+ Add Site</Button>
-        </DialogFooter>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium mb-1">
+                Site Name
+              </label>
+              <Input
+                id="name"
+                placeholder="My Website"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label htmlFor="url" className="block text-sm font-medium mb-1">
+                URL
+              </label>
+              <Input
+                id="url"
+                placeholder="example.com"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            {error && (
+              <p className="text-sm text-red-600">{error}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Adding..." : "+ Add Site"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
