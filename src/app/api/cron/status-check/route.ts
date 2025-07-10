@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import {
+    BaseStatusResult,
+    createStatusResult,
+    logStatusResult,
+} from "@/lib/status-results";
 
 export async function GET(request: NextRequest) {
     try {
@@ -34,6 +39,7 @@ export async function GET(request: NextRequest) {
         const results = await Promise.allSettled(
             websites.map(async (website) => {
                 const startTime = Date.now();
+                let result: BaseStatusResult;
 
                 try {
                     const controller = new AbortController();
@@ -53,48 +59,37 @@ export async function GET(request: NextRequest) {
                     clearTimeout(timeoutId);
 
                     const responseTime = Date.now() - startTime;
-                    const status = response.ok ? "Online" : "Offline";
                     const statusCode = response.status;
 
-                    await supabase
-                        .from("status_checks")
-                        .insert({
-                            website_id: website.id,
-                            status: status,
-                            response_time: responseTime,
-                            status_code: statusCode,
-                            checked_at: new Date().toISOString(),
-                        });
-
-                    return {
-                        website: website.name,
-                        status,
-                        responseTime,
+                    result = createStatusResult(
                         statusCode,
-                    };
+                        responseTime,
+                        website.url,
+                        false,
+                    );
                 } catch (error) {
                     const responseTime = Date.now() - startTime;
 
-                    await supabase
-                        .from("status_checks")
-                        .insert({
-                            website_id: website.id,
-                            status: "Timeout",
-                            response_time: responseTime,
-                            status_code: 0,
-                            checked_at: new Date().toISOString(),
-                        });
-
-                    return {
-                        website: website.name,
-                        status: "Timeout",
+                    result = createStatusResult(
+                        0,
                         responseTime,
-                        statusCode: 0,
-                        error: error instanceof Error
-                            ? error.message
-                            : "Unknown error",
-                    };
+                        website.url,
+                        true,
+                    );
                 }
+
+                const dbRecord = result.toDbRecord(website.id);
+                await supabase.from("status_checks").insert(dbRecord);
+
+                logStatusResult(result);
+
+                return {
+                    website: website.name,
+                    status: result.getStatusText(),
+                    responseTime: result.responseTime,
+                    statusCode: result.statusCode,
+                    message: result.getDisplayMessage(),
+                };
             }),
         );
 
