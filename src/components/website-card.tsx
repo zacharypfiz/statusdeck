@@ -37,36 +37,36 @@ export default function WebsiteCard({
   const supabase = createClient();
 
   useEffect(() => {
+    const fetchRealData = async () => {
+      const { data: statusChecks } = await supabase
+        .from("status_checks")
+        .select("*")
+        .eq("website_id", website.id)
+        .order("checked_at", { ascending: false })
+        .limit(24);
+
+      if (statusChecks && statusChecks.length > 0) {
+        const formattedData = statusChecks.reverse().map((check) => ({
+          time: new Date(check.checked_at).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        }),
+          responseTime: check.response_time || 0,
+          status: check.status_code || 0,
+        }));
+        setChartData(formattedData);
+      } else {
+        setChartData([]);
+      }
+    };
+
     if (isDemo) {
       setChartData(generateChartData());
     } else {
       fetchRealData();
     }
-  }, [website.id, isDemo]);
-
-  const fetchRealData = async () => {
-    const { data: statusChecks } = await supabase
-      .from("status_checks")
-      .select("*")
-      .eq("website_id", website.id)
-      .order("checked_at", { ascending: false })
-      .limit(24);
-
-    if (statusChecks && statusChecks.length > 0) {
-      const formattedData = statusChecks.reverse().map((check) => ({
-        time: new Date(check.checked_at).toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      }),
-        responseTime: check.response_time || 0,
-        status: check.status_code || 0,
-      }));
-      setChartData(formattedData);
-    } else {
-      setChartData([]);
-    }
-  };
+  }, [website.id, isDemo, supabase]);
 
   if (chartData.length === 0) {
     const message = isDemo ? "Loading chart..." : "No monitoring data yet";

@@ -62,77 +62,75 @@ export default function SiteDashboardPage() {
   const supabase = createClient();
 
   useEffect(() => {
+    const fetchWebsiteData = async () => {
+      const { data: websiteData } = await supabase
+        .from("websites")
+        .select("*")
+        .eq("name", siteName)
+        .single();
+
+      if (websiteData) {
+        setWebsite(websiteData);
+        setIsDemo(false);
+      } else {
+        setWebsite({ name: siteName, url: `https://${siteName}` });
+        setIsDemo(true);
+      }
+    };
     fetchWebsiteData();
-  }, [siteName]);
+  }, [siteName, supabase]);
 
   useEffect(() => {
+    const fetchStatusChecks = async () => {
+      if (isDemo || !website) {
+        setChartData(generateChartData(timeRange));
+        return;
+      }
+
+      const now = new Date();
+      let startTime = new Date();
+
+      switch (timeRange) {
+        case "1h":
+          startTime = new Date(now.getTime() - 60 * 60 * 1000);
+          break;
+        case "6h":
+          startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+          break;
+        case "24h":
+          startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case "7d":
+          startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case "30d":
+          startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+      }
+
+      const { data: statusChecks } = await supabase
+        .from("status_checks")
+        .select("*")
+        .eq("website_id", website.id!)
+        .gte("checked_at", startTime.toISOString())
+        .order("checked_at", { ascending: true });
+
+      if (statusChecks && statusChecks.length > 0) {
+        const formattedData = statusChecks.map((check) => ({
+          time: check.checked_at,
+          responseTime: check.response_time || 0,
+          status: check.status_code || 0,
+        }));
+        setChartData(formattedData);
+      } else {
+        setChartData([]);
+      }
+    };
+
     if (website) {
       fetchStatusChecks();
     }
-  }, [website, timeRange]);
-
-  const fetchWebsiteData = async () => {
-    const { data: websiteData } = await supabase
-      .from("websites")
-      .select("*")
-      .eq("name", siteName)
-      .single();
-
-    if (websiteData) {
-      setWebsite(websiteData);
-      setIsDemo(false);
-    } else {
-      setWebsite({ name: siteName, url: `https://${siteName}` });
-      setIsDemo(true);
-      setChartData(generateChartData(timeRange));
-    }
-  };
-
-  const fetchStatusChecks = async () => {
-    if (isDemo || !website) {
-    setChartData(generateChartData(timeRange));
-      return;
-    }
-
-    const now = new Date();
-    let startTime = new Date();
-    
-    switch (timeRange) {
-      case "1h":
-        startTime = new Date(now.getTime() - 60 * 60 * 1000);
-        break;
-      case "6h":
-        startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000);
-        break;
-      case "24h":
-        startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        break;
-      case "7d":
-        startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case "30d":
-        startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-    }
-
-    const { data: statusChecks } = await supabase
-      .from("status_checks")
-      .select("*")
-      .eq("website_id", website.id!)
-      .gte("checked_at", startTime.toISOString())
-      .order("checked_at", { ascending: true });
-
-    if (statusChecks && statusChecks.length > 0) {
-      const formattedData = statusChecks.map((check) => ({
-        time: check.checked_at,
-        responseTime: check.response_time || 0,
-        status: check.status_code || 0,
-      }));
-      setChartData(formattedData);
-    } else {
-      setChartData([]);
-    }
-  };
+  }, [website, timeRange, isDemo, supabase]);
 
   const formatTick = (tick: string) => {
     const date = new Date(tick);

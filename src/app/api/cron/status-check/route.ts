@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
                         website.url,
                         false,
                     );
-                } catch (error) {
+                } catch {
                     const responseTime = Date.now() - startTime;
 
                     result = createStatusResult(

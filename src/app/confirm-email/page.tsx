@@ -37,7 +37,7 @@ export default async function ConfirmEmailPage({
           </div>
           <CardTitle className="text-2xl">Check Your Email</CardTitle>
           <CardDescription className="text-base">
-            We've sent a confirmation link to your email address
+            We&apos;ve sent a confirmation link to your email address
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
