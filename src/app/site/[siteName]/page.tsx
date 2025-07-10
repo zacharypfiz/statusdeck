@@ -307,17 +307,24 @@ export default function SiteDashboardPage() {
                 </span>
               )}
             </div>
-            <ToggleGroup
-              type="single"
-              value={timeRange}
-              onValueChange={(value) => value && setTimeRange(value)}
-            >
-              <ToggleGroupItem value="1h">1H</ToggleGroupItem>
-              <ToggleGroupItem value="6h">6H</ToggleGroupItem>
-              <ToggleGroupItem value="24h">24H</ToggleGroupItem>
-              <ToggleGroupItem value="7d">7D</ToggleGroupItem>
-              <ToggleGroupItem value="30d">30D</ToggleGroupItem>
-            </ToggleGroup>
+            <div className="flex items-center gap-3">
+              <ToggleGroup
+                type="single"
+                value={timeRange}
+                onValueChange={(value) => value && setTimeRange(value)}
+              >
+                <ToggleGroupItem value="1h">1H</ToggleGroupItem>
+                <ToggleGroupItem value="6h">6H</ToggleGroupItem>
+                <ToggleGroupItem value="24h">24H</ToggleGroupItem>
+                <ToggleGroupItem value="7d">7D</ToggleGroupItem>
+                <ToggleGroupItem value="30d">30D</ToggleGroupItem>
+              </ToggleGroup>
+              <Button asChild variant="outline">
+                <Link href={`/site/${encodeURIComponent(siteName)}/report`}>
+                  Generate Report
+                </Link>
+              </Button>
+            </div>
           </div>
           <Card>
             <CardHeader>
