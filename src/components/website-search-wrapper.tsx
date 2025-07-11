@@ -16,7 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import WebsiteCard from "@/components/website-card";
 
 const statusFilters = [
-  { label: "All", value: "all", color: "bg-gray-500" },
+  { label: "All", value: "all", color: "bg-gray-400" },
   { label: "Online (200-299)", value: "success", color: "bg-green-500" },
   { label: "Redirect (300-399)", value: "redirect", color: "bg-blue-500" },
   { label: "Client Error (400-499)", value: "client-error", color: "bg-yellow-500" },
@@ -101,13 +101,19 @@ export default function WebsiteSearchWrapper({
           />
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
+              <Button variant="ghost" size="sm" className="gap-1.5">
+                <Filter className="h-4 w-4" />
+                <span>Filter</span>
                 {statusFilter !== "all" && (
-                  <span className="ml-2 px-2 py-1 text-xs bg-primary/20 rounded">
-                    {statusFilters.find(f => f.value === statusFilter)?.label.split(' ')[0]}
-                  </span>
+                  <>
+                    <div className="mx-1 h-4 w-px bg-muted-foreground" />
+                    <span className="font-semibold text-primary">
+                      {
+                        statusFilters.find((f) => f.value === statusFilter)
+                          ?.label.split(" ")[0]
+                      }
+                    </span>
+                  </>
                 )}
               </Button>
             </DialogTrigger>
