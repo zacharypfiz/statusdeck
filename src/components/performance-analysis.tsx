@@ -15,7 +15,7 @@ interface ChartData {
 }
 
 interface Stats {
-  avgResponseTime: number;
+  averageResponseTime: number;
   uptime: number;
   incidents: number;
   totalChecks: number;
@@ -31,8 +31,8 @@ export default function PerformanceAnalysis({
   chartData,
 }: PerformanceAnalysisProps) {
   const getResponseTimeInsight = () => {
-    const { avgResponseTime } = stats;
-    if (avgResponseTime === 0)
+    const { averageResponseTime } = stats;
+    if (averageResponseTime === 0)
       return {
         icon: Clock,
         title: "Response Time Analysis",
@@ -40,25 +40,25 @@ export default function PerformanceAnalysis({
         status: "neutral" as const,
         metric: "No data",
       };
-    if (avgResponseTime < 200)
+    if (averageResponseTime < 200)
       return {
         icon: Zap,
         title: "Response Time",
         recommendation:
           "Outstanding performance! Your site delivers lightning-fast responses that create an exceptional user experience and boost SEO rankings.",
         status: "excellent" as const,
-        metric: `${avgResponseTime}ms`,
+        metric: `${averageResponseTime}ms`,
       };
-    if (avgResponseTime < 500)
+    if (averageResponseTime < 500)
       return {
         icon: TrendingUp,
         title: "Response Time",
         recommendation:
           "Great performance! Your site responds quickly, keeping users engaged and search engines happy.",
         status: "good" as const,
-        metric: `${avgResponseTime}ms`,
+        metric: `${averageResponseTime}ms`,
       };
-    if (avgResponseTime < 1000)
+    if (averageResponseTime < 1000)
       return {
         icon: Clock,
         title: "Response Time",
@@ -76,7 +76,7 @@ export default function PerformanceAnalysis({
           </>
         ),
         status: "warning" as const,
-        metric: `${avgResponseTime}ms`,
+        metric: `${averageResponseTime}ms`,
       };
     return {
       icon: AlertCircle,
@@ -96,7 +96,7 @@ export default function PerformanceAnalysis({
         </>
       ),
       status: "critical" as const,
-      metric: `${avgResponseTime}ms`,
+      metric: `${averageResponseTime}ms`,
     };
   };
 

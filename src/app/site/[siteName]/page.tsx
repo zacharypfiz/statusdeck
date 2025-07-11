@@ -46,7 +46,7 @@ import {
 } from "@/components/shared-chart-components";
 import { generateChartData } from "@/lib/mock-data";
 import PerformanceAnalysis from "@/components/performance-analysis";
-import { cn } from "@/lib/utils";
+import { cn, calculatePerformanceStats } from "@/lib/utils";
 
 const statusFilters = [
   { label: "All", value: "all", color: "bg-gray-400" },
@@ -294,41 +294,13 @@ export default function SiteDashboardPage() {
     });
   };
 
-  const calculateStats = () => {
-    if (chartData.length === 0) {
-      return {
-        avgResponseTime: 0,
-        uptime: 0,
-        totalChecks: 0,
-        incidents: 0,
-      };
-    }
-
-    const responseTimes = chartData
-      .map((d) => d.responseTime)
-      .filter((rt) => rt > 0);
-    const avgResponseTime =
-      responseTimes.length > 0
-        ? Math.round(
-            responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
-          )
-        : 0;
-
-    const successfulChecks = chartData.filter(
-      (d) => d.status >= 200 && d.status < 300
-    ).length;
-    const uptime = chartData.length > 0 ? (successfulChecks / chartData.length) * 100 : 0;
-    const incidents = chartData.length - successfulChecks;
-
-    return {
-      avgResponseTime,
-      uptime: parseFloat(uptime.toFixed(2)),
-      totalChecks: chartData.length,
-      incidents,
-    };
-  };
-
-  const stats = calculateStats();
+  const stats = calculatePerformanceStats(
+    allChartData.map((check) => ({
+      status: check.status >= 200 && check.status < 400 ? 'Online' : 'Error',
+      response_time: check.responseTime,
+      status_code: check.status,
+    }))
+  );
 
   const handleUpdateWebsite = async () => {
     if (!website || isDemo) return;
@@ -561,7 +533,7 @@ export default function SiteDashboardPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
             <StatCard
               title="Average Response Time"
-              value={`${stats.avgResponseTime}ms`}
+              value={`${stats.averageResponseTime}ms`}
             />
             <StatCard title="Uptime" value={`${stats.uptime}%`} />
             <StatCard
