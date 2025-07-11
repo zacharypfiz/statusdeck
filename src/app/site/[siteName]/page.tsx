@@ -31,12 +31,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/header";
 import Link from "next/link";
-import { ArrowLeft, Settings } from "lucide-react";
+import { ArrowLeft, Settings, Filter } from "lucide-react";
 import StatCard from "@/components/stat-card";
 import {
   CustomDot,
@@ -44,12 +45,34 @@ import {
   chartConfig,
 } from "@/components/shared-chart-components";
 import { generateChartData } from "@/lib/mock-data";
+import PerformanceAnalysis from "@/components/performance-analysis";
+import { cn } from "@/lib/utils";
+
+const statusFilters = [
+  { label: "All", value: "all", color: "bg-gray-400" },
+  { label: "Online (200-299)", value: "success", color: "bg-green-500" },
+  { label: "Redirect (300-399)", value: "redirect", color: "bg-blue-500" },
+  { label: "Client Error (400-499)", value: "client-error", color: "bg-yellow-500" },
+  { label: "Server Error (500+)", value: "server-error", color: "bg-red-500" },
+  { label: "Timeout (0)", value: "timeout", color: "bg-gray-500" },
+];
+
+const getStatusCategory = (status: number) => {
+  if (status === 0) return "timeout";
+  if (status >= 500) return "server-error";
+  if (status >= 400) return "client-error";
+  if (status >= 300) return "redirect";
+  if (status >= 200) return "success";
+  return "all";
+};
 
 export default function SiteDashboardPage() {
   const params = useParams<{ siteName: string }>();
   const router = useRouter();
   const [timeRange, setTimeRange] = useState("6h");
   const [chartData, setChartData] = useState<{time: string; responseTime: number; status: number}[]>([]);
+  const [allChartData, setAllChartData] = useState<{time: string; responseTime: number; status: number}[]>([]);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [website, setWebsite] = useState<{id?: string; name: string; url: string} | null>(null);
   const [isDemo, setIsDemo] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -82,8 +105,12 @@ export default function SiteDashboardPage() {
 
   useEffect(() => {
     const fetchStatusChecks = async () => {
-      if (isDemo || !website) {
+      if (isDemo) {
         setChartData(generateChartData(timeRange));
+        return;
+      }
+
+      if (!website) {
         return;
       }
 
@@ -113,24 +140,146 @@ export default function SiteDashboardPage() {
         .select("*")
         .eq("website_id", website.id!)
         .gte("checked_at", startTime.toISOString())
-        .order("checked_at", { ascending: true });
+        .order("checked_at", { ascending: false })
+        .limit(1000);
 
       if (statusChecks && statusChecks.length > 0) {
-        const formattedData = statusChecks.map((check) => ({
+        const formattedData = statusChecks.reverse().map((check) => ({
           time: check.checked_at,
           responseTime: check.response_time || 0,
           status: check.status_code || 0,
         }));
-        setChartData(formattedData);
+        setAllChartData(formattedData);
       } else {
-        setChartData([]);
+        setAllChartData([]);
       }
     };
 
-    if (website) {
-      fetchStatusChecks();
-    }
+    fetchStatusChecks();
   }, [website, timeRange, isDemo, supabase]);
+
+  useEffect(() => {
+    const fetchFilteredData = async () => {
+      if (isDemo) {
+        if (statusFilter === "all") {
+          setChartData(allChartData);
+        } else {
+          const filteredData = allChartData.filter((data) => {
+            const category = getStatusCategory(data.status);
+            return category === statusFilter;
+          });
+          setChartData(filteredData);
+        }
+        return;
+      }
+
+      if (!website) return;
+
+      if (statusFilter === "all") {
+        setChartData(allChartData);
+        return;
+      }
+
+      // For specific status filters, fetch fresh data with status-specific query
+      const now = new Date();
+      let startTime = new Date();
+
+      switch (timeRange) {
+        case "1h":
+          startTime = new Date(now.getTime() - 60 * 60 * 1000);
+          break;
+        case "6h":
+          startTime = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+          break;
+        case "24h":
+          startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case "7d":
+          startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case "30d":
+          startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+      }
+
+      // Build status code filter and query based on category
+      let filteredChecks;
+      
+      switch (statusFilter) {
+        case "success":
+          ({ data: filteredChecks } = await supabase
+            .from("status_checks")
+            .select("*")
+            .eq("website_id", website.id!)
+            .gte("checked_at", startTime.toISOString())
+            .gte("status_code", 200)
+            .lt("status_code", 300)
+            .order("checked_at", { ascending: false })
+            .limit(1000));
+          break;
+        case "redirect":
+          ({ data: filteredChecks } = await supabase
+            .from("status_checks")
+            .select("*")
+            .eq("website_id", website.id!)
+            .gte("checked_at", startTime.toISOString())
+            .gte("status_code", 300)
+            .lt("status_code", 400)
+            .order("checked_at", { ascending: false })
+            .limit(1000));
+          break;
+        case "client-error":
+          ({ data: filteredChecks } = await supabase
+            .from("status_checks")
+            .select("*")
+            .eq("website_id", website.id!)
+            .gte("checked_at", startTime.toISOString())
+            .gte("status_code", 400)
+            .lt("status_code", 500)
+            .order("checked_at", { ascending: false })
+            .limit(1000));
+          break;
+        case "server-error":
+          ({ data: filteredChecks } = await supabase
+            .from("status_checks")
+            .select("*")
+            .eq("website_id", website.id!)
+            .gte("checked_at", startTime.toISOString())
+            .gte("status_code", 500)
+            .order("checked_at", { ascending: false })
+            .limit(1000));
+          break;
+        case "timeout":
+          ({ data: filteredChecks } = await supabase
+            .from("status_checks")
+            .select("*")
+            .eq("website_id", website.id!)
+            .gte("checked_at", startTime.toISOString())
+            .eq("status_code", 0)
+            .order("checked_at", { ascending: false })
+            .limit(1000));
+          break;
+        default:
+          filteredChecks = null;
+      }
+
+      if (filteredChecks) {
+
+        if (filteredChecks && filteredChecks.length > 0) {
+          const formattedData = filteredChecks.reverse().map((check) => ({
+            time: check.checked_at,
+            responseTime: check.response_time || 0,
+            status: check.status_code || 0,
+          }));
+          setChartData(formattedData);
+        } else {
+          setChartData([]);
+        }
+      }
+    };
+
+    fetchFilteredData();
+  }, [allChartData, statusFilter, website, timeRange, isDemo, supabase]);
 
   const formatTick = (tick: string) => {
     const date = new Date(tick);
@@ -328,7 +477,50 @@ export default function SiteDashboardPage() {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Response Time</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Response Time</CardTitle>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="sm" className="gap-1.5">
+                      <Filter className="h-4 w-4" />
+                      <span>Filter</span>
+                      {statusFilter !== "all" && (
+                        <>
+                          <div className="mx-1 h-4 w-px bg-muted-foreground" />
+                          <span className="font-semibold text-primary">
+                            {
+                              statusFilters.find((f) => f.value === statusFilter)
+                                ?.label.split(" ")[0]
+                            }
+                          </span>
+                        </>
+                      )}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Filter by Status</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                      {statusFilters.map((filter) => (
+                        <div
+                          key={filter.value}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                            statusFilter === filter.value
+                              ? "bg-primary/10 border-primary"
+                              : "hover:bg-muted"
+                          )}
+                          onClick={() => setStatusFilter(filter.value)}
+                        >
+                          <div className={cn("w-3 h-3 rounded-full", filter.color)} />
+                          <span className="text-sm font-medium">{filter.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </CardHeader>
             <CardContent>
               {chartData.length > 0 ? (
@@ -380,6 +572,8 @@ export default function SiteDashboardPage() {
             />
             <StatCard title="Incidents" value={stats.incidents.toString()} />
           </div>
+          
+          <PerformanceAnalysis stats={stats} chartData={chartData} />
         </div>
       </main>
 
