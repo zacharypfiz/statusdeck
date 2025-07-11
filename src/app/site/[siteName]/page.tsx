@@ -106,7 +106,8 @@ export default function SiteDashboardPage() {
   useEffect(() => {
     const fetchStatusChecks = async () => {
       if (isDemo) {
-        setChartData(generateChartData(timeRange));
+        const mockData = generateChartData(timeRange);
+        setAllChartData(mockData);
         return;
       }
 
@@ -263,18 +264,15 @@ export default function SiteDashboardPage() {
           filteredChecks = null;
       }
 
-      if (filteredChecks) {
-
-        if (filteredChecks && filteredChecks.length > 0) {
-          const formattedData = filteredChecks.reverse().map((check) => ({
-            time: check.checked_at,
-            responseTime: check.response_time || 0,
-            status: check.status_code || 0,
-          }));
-          setChartData(formattedData);
-        } else {
-          setChartData([]);
-        }
+      if (filteredChecks && filteredChecks.length > 0) {
+        const formattedData = filteredChecks.reverse().map((check) => ({
+          time: check.checked_at,
+          responseTime: check.response_time || 0,
+          status: check.status_code || 0,
+        }));
+        setChartData(formattedData);
+      } else {
+        setChartData([]);
       }
     };
 

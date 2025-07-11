@@ -31,19 +31,61 @@ export default async function ReportPage({
     .eq("name", decodedSiteName)
     .single();
 
+  let statusChecks;
+  let isDemo = false;
+  let websiteInfo;
+
   if (!website) {
-    return redirect("/");
+    // This is a demo site, create mock data
+    isDemo = true;
+    websiteInfo = {
+      name: decodedSiteName,
+      url: `https://${decodedSiteName}`,
+    };
+    
+    // Generate mock status checks for the last 7 days
+    const mockChecks = [];
+    const now = new Date();
+    
+    for (let i = 0; i < 168; i++) { // 7 days * 24 hours
+      const checkTime = new Date(now.getTime() - i * 60 * 60 * 1000); // Every hour
+      const baseResponseTime = 150 + Math.sin((checkTime.getHours() / 24) * Math.PI * 2) * 50;
+      let responseTime = Math.round(baseResponseTime + Math.random() * 80);
+      
+      let statusCode = 200;
+      const random = Math.random();
+      if (random > 0.98) {
+        statusCode = 0;
+        responseTime = 0;
+      } else if (random > 0.95) {
+        statusCode = 500 + Math.floor(Math.random() * 4);
+      } else if (random > 0.9) {
+        statusCode = 400 + Math.floor(Math.random() * 5);
+      }
+      
+      mockChecks.push({
+        id: `mock-${i}`,
+        checked_at: checkTime.toISOString(),
+        status_code: statusCode,
+        response_time: responseTime,
+      });
+    }
+    
+    statusChecks = mockChecks;
+  } else {
+    websiteInfo = website;
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const { data: realStatusChecks } = await supabase
+      .from("status_checks")
+      .select("*")
+      .eq("website_id", website.id)
+      .gte("checked_at", sevenDaysAgo.toISOString())
+      .order("checked_at", { ascending: false });
+    
+    statusChecks = realStatusChecks;
   }
-
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-  const { data: statusChecks } = await supabase
-    .from("status_checks")
-    .select("*")
-    .eq("website_id", website.id)
-    .gte("checked_at", sevenDaysAgo.toISOString())
-    .order("checked_at", { ascending: false });
 
   const getStatusText = (statusCode: number) => {
     if (statusCode === 0) return "Timeout";
@@ -66,7 +108,14 @@ export default async function ReportPage({
                 Back
               </Button>
             </Link>
-            <h1 className="text-3xl font-bold">Status Report - {website.name}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold">Status Report - {websiteInfo.name}</h1>
+              {isDemo && (
+                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
+                  Demo Data
+                </span>
+              )}
+            </div>
           </div>
 
           <Card>
@@ -105,10 +154,10 @@ export default async function ReportPage({
                           </span>
                         </td>
                         <td className="p-2">{check.response_time || 0}</td>
-                        <td className="p-2">{website.name}</td>
+                        <td className="p-2">{websiteInfo.name}</td>
                         <td className="p-2 text-blue-600 hover:underline">
-                          <a href={website.url} target="_blank" rel="noopener noreferrer">
-                            {website.url}
+                          <a href={websiteInfo.url} target="_blank" rel="noopener noreferrer">
+                            {websiteInfo.url}
                           </a>
                         </td>
                       </tr>
