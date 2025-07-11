@@ -31,8 +31,8 @@ export default function CreateAccountPage() {
     }
 
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
+      email: email.trim(),
+      password: password.trim(),
       options: {
         emailRedirectTo: `${window.location.origin}/login`,
       },

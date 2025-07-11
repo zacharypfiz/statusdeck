@@ -28,6 +28,39 @@ export default function AddSiteModal({
   const [error, setError] = useState("");
   const supabase = createClient();
 
+  const validateUrl = (input: string): { valid: boolean; url?: string; error?: string } => {
+    const trimmed = input.trim();
+    
+    let urlToTest = trimmed;
+    if (!urlToTest.startsWith("http://") && !urlToTest.startsWith("https://")) {
+      urlToTest = "https://" + urlToTest;
+    }
+
+    // Use URL.canParse if available, otherwise fallback to try/catch
+    const isValid = typeof URL.canParse === 'function' 
+      ? URL.canParse(urlToTest)
+      : (() => {
+          try {
+            new URL(urlToTest);
+            return true;
+          } catch {
+            return false;
+          }
+        })();
+
+    if (!isValid) {
+      return { valid: false, error: "Please enter a valid URL" };
+    }
+
+    // Check if the URL has a valid domain structure
+    const url = new URL(urlToTest);
+    if (!url.hostname.includes('.')) {
+      return { valid: false, error: "Please enter a complete domain (e.g., example.com)" };
+    }
+
+    return { valid: true, url: urlToTest };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -35,6 +68,13 @@ export default function AddSiteModal({
 
     if (!name.trim() || !url.trim()) {
       setError("Please fill in both fields");
+      setLoading(false);
+      return;
+    }
+
+    const urlValidation = validateUrl(url);
+    if (!urlValidation.valid) {
+      setError(urlValidation.error || "Invalid URL");
       setLoading(false);
       return;
     }
@@ -48,10 +88,7 @@ export default function AddSiteModal({
         return;
       }
 
-      let processedUrl = url.trim();
-      if (!processedUrl.startsWith("http://") && !processedUrl.startsWith("https://")) {
-        processedUrl = "https://" + processedUrl;
-      }
+      const processedUrl = urlValidation.url!;
 
       const { error: insertError } = await supabase
         .from("websites")
